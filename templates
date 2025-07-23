@@ -1,1 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>EPUB Audio Reader</title>
+  <style>
+    body { font-family: sans-serif; margin: 2rem; }
+    #chunks div { margin: .5rem 0; padding: .5rem; cursor: pointer; }
+    .playing { background-color: #f0f8ff; }
+  </style>
+</head>
+<body>
+  <h1>EPUB Audio Reader</h1>
+  <form id="uploadForm">
+    <input type="file" id="epub" accept=".epub" required />
+    <select id="voice">
+      <option value="en-US-JennyNeural">Jenny</option>
+      <option value="en-US-GuyNeural">Guy</option>
+    </select>
+    <button type="submit">Upload</button>
+  </form>
 
+  <div id="chunks"></div>
+
+  <script>
+    document.getElementById('uploadForm').onsubmit = async (e) => {
+      e.preventDefault();
+      const fileInput = document.getElementById('epub');
+      const voice = document.getElementById('voice').value;
+
+      const formData = new FormData();
+      formData.append('epub', fileInput.files[0]);
+      formData.append('voice', voice);
+
+      const res = await fetch('/upload', { method: 'POST', body: formData });
+      const { upload_id, chunks } = await res.json();
+
+      const container = document.getElementById('chunks');
+      container.innerHTML = '';
+
+      chunks.forEach((text, idx) => {
+        const div = document.createElement('div');
+        div.textContent = text;
+        div.onclick = () => playChunk(upload_id, idx, div);
+        container.appendChild(div);
+      });
+    };
+
+    async function playChunk(upload_id, idx, el) {
+      // Highlight
+      document.querySelectorAll('.playing').forEach(x => x.classList.remove('playing'));
+      el.classList.add('playing');
+
+      // Fetch audio bytes
+      const res = await fetch('/chunk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ upload_id, index: idx })
+      });
+      const buf = await res.arrayBuffer();
+      new Audio(URL.createObjectURL(new Blob([buf], { type: 'audio/mpeg' }))).play();
+    }
+  </script>
+</body>
+</html>
